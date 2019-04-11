@@ -12,17 +12,21 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 library(tidyverse)
-library(glue)
 library(tidytext)
-library(gutenbergr)
 library(wordcloud)
 library(readxl)
+library(widyr)
+library(igraph)
+library(ggraph)
+library(stringr)
 ```
 
 Steps necessary:
 
 ```{r}
-conference_raw <- read_excel("Conference Talks.xlsx")
+conference_raw <- read_excel("Conference Talks.xlsx") %>%
+  mutate(year = 2019,
+         conference = "April")
 
 numbers <- seq(1:100)
 
@@ -34,15 +38,6 @@ conference <- conference_raw %>%
   filter(!(word %in% c(numbers)))
 
 
-
-# bigram
-conference_bigram <- conference_raw %>%
-  unnest_tokens(bigram, Text, token = "ngrams", n = 2) %>%
-  separate(bigram, c("word1", "word2"), sep = " ") %>%
-  filter(!(word1 %in% stop_words$word),
-         !(word2 %in% stop_words$word),
-         !(word1 %in% numbers),
-         !(word2 %in% numbers))
 
 conference %>%
   count(word, sort = TRUE) %>%
@@ -60,16 +55,119 @@ conference %>%
   with(wordcloud(word, n, max.words = 100))
 ```
 
+## Bigram
+
+Counts: nothing interesting
+```{r}
+# bigram
+conference_bigram <- conference_raw %>%
+  unnest_tokens(bigram, Text, token = "ngrams", n = 2) %>%
+  separate(bigram, c("word1", "word2"), sep = " ") %>%
+  filter(!(word1 %in% stop_words$word),
+         !(word2 %in% stop_words$word),
+         !(word1 %in% numbers),
+         !(word2 %in% numbers)) %>%
+  unite(bigram, word1, word2, sep = " ")
+
+conference_bigram %>%
+  group_by(Session) %>%
+  count(bigram, sort = TRUE) %>%
+  top_n(10, bigram) %>%
+  ungroup() %>%
+  mutate(bigram = fct_reorder(bigram, n)) %>%
+  ggplot(aes(bigram, n, fill = Session)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  facet_wrap(~Session, scale = "free_y")
+```
+
+Correlation
+
+```{r}
+word_cors <- conference %>%
+  group_by(word) %>%
+  filter(n() >= 20) %>%
+  pairwise_cor(word, Talk, sort = TRUE) %>%
+  filter(correlation != 1)
+
+word_cors
+```
+
+```{r}
+
+word_cors %>%
+  filter(item1 %in% c("church", "love", "gospel", "temple")) %>%
+  group_by(item1) %>%
+  top_n(6) %>%
+  ungroup() %>%
+  mutate(item2 = fct_reorder(item2, correlation)) %>%
+  ggplot(aes(item2, correlation,  fill = item1)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  facet_wrap( ~ item1, scales = "free") +
+  coord_flip() +
+  theme_light() +
+  labs(x = "Correlation", y = "Word", 
+       title = "Correlation between Words")
+```
+
+```{r}
+set.seed(2016)
+
+word_cors %>%
+  filter(correlation > .50) %>%
+  graph_from_data_frame() %>%
+  ggraph(layout = "fr") +
+  geom_edge_link(aes(edge_alpha = correlation), show.legend = FALSE) +
+  geom_node_point(color = "lightblue", size = 5) +
+  geom_node_text(aes(label = name), repel = TRUE) +
+  theme_void()
+```
+
+
+```{r}
+# creating necessary functions
+count_bigrams <- function(dataset) {
+  dataset %>%
+    unnest_tokens(bigram, Text, token = "ngrams", n = 2) %>%
+    separate(bigram, c("word1", "word2"), sep = " ") %>%
+    filter(!word1 %in% stop_words$word,
+           !word2 %in% stop_words$word) %>%
+    count(word1, word2, sort = TRUE)
+}
+
+visualize_bigrams <- function(bigrams) {
+  set.seed(2016)
+  a <- grid::arrow(type = "closed", length = unit(.15, "inches"))
+  
+  bigrams %>%
+    graph_from_data_frame() %>%
+    ggraph(layout = "fr") +
+    geom_edge_link(aes(edge_alpha = n), show.legend = FALSE, arrow = a) +
+    geom_node_point(color = "lightblue", size = 5) +
+    geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+    theme_void()
+}
+
+conference_raw %>%
+  count_bigrams() %>%
+  filter(n > 5,
+  !str_detect(word1, "\\d"),
+  !str_detect(word2, "\\d")) %>%
+  visualize_bigrams()
+```
 
 
 
-2. make them unigrams
-    - tidy text, unnest_tokens()
-3. take out stop words
-    - anti_join
-4. word clouds
-    - try it maybe for the global and then for each session
+
+
+
+
+
+
 5. tf_idf
     - get unique words for people
 6. topic modeling
     - Use this informed maybe by word clouds
+    
+    
+    

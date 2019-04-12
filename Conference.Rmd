@@ -94,20 +94,24 @@ word_cors
 ```
 
 ```{r}
+data$carb <- factor(data$carb, levels = data$carb[order(-data$mpg)])
+
 
 word_cors %>%
   filter(item1 %in% c("church", "love", "gospel", "temple")) %>%
   group_by(item1) %>%
-  top_n(6) %>%
+  top_n(10) %>%
   ungroup() %>%
-  mutate(item2 = fct_reorder(item2, correlation)) %>%
+  mutate(item2 = reorder(item2, desc(correlation))) %>% 
   ggplot(aes(item2, correlation,  fill = item1)) +
-  geom_bar(stat = "identity", show.legend = FALSE) +
-  facet_wrap( ~ item1, scales = "free") +
+  geom_col(show.legend = FALSE) +
+  facet_wrap( ~ item1, scales = "free_y") +
   coord_flip() +
   theme_light() +
   labs(x = "Correlation", y = "Word", 
        title = "Correlation between Words")
+
+# ggsave("Correlation between words.jpeg")
 ```
 
 ```{r}
@@ -121,6 +125,8 @@ word_cors %>%
   geom_node_point(color = "lightblue", size = 5) +
   geom_node_text(aes(label = name), repel = TRUE) +
   theme_void()
+
+# ggsave("network graph.jpeg")
 ```
 
 

@@ -164,14 +164,63 @@ conference_raw %>%
 
 
 
+```{r}
+talk_tf_idf <- conference %>%
+  count(Talk, word) %>%
+  bind_tf_idf(word, Talk, n)
+
+nelson_talks <- conference[conference$Author == "Russell M. Nelson",]
+nelson_talks <- unique(nelson_talks$Talk)
+
+
+talk_tf_idf %>%
+  filter(Talk %in% nelson_talks) %>%
+  arrange(desc(tf_idf)) %>%
+  mutate(word = factor(word, levels = rev(unique(word)))) %>%
+  group_by(Talk) %>%
+  top_n(15) %>%
+  ungroup() %>%
+  ggplot(aes(x = word, y = tf_idf, fill = Talk)) +
+  geom_col(show.legend = FALSE) +
+  labs(x = "Word", y = "Most Important Words",
+     caption = "Scores are tf-idf Statistics", 
+     title = "Most Important Words for President Nelson's Talks") +
+  facet_wrap(~ Talk, scales = "free") +
+  coord_flip() +
+  theme_classic()
+
+ggsave("Nelson's Talks.jpeg")
+```
+
+```{r}
+author_tf_idf <- conference %>%
+  count(Author, word) %>%
+  bind_tf_idf(word, Author, n)
+
+author_tf_idf %>%
+  filter(Author %in% c("Russell M. Nelson", "Becky Craven", "Jeffrey R. Holland")) %>%
+  arrange(desc(tf_idf)) %>%
+  mutate(word = factor(word, levels = rev(unique(word)))) %>%
+  group_by(Author) %>%
+  top_n(15) %>%
+  ungroup() %>%
+  ggplot(aes(x = word, y = tf_idf, fill = Author)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ Author, scales = "free") +
+  labs(x = "Word", y = "Most Important Words",
+       caption = "Scores are tf-idf Statistics",
+       title = "Most Important Words for Three Speakers") +
+  coord_flip() +
+  theme_classic()
+
+ggsave("tf idf of Speakers.jpeg")
+```
 
 
 
 
 
-
-5. tf_idf
-    - get unique words for people
+5. sentiment
 6. topic modeling
     - Use this informed maybe by word clouds
     

@@ -19,6 +19,7 @@ library(widyr)
 library(igraph)
 library(ggraph)
 library(stringr)
+library(gridExtra)
 ```
 
 Steps necessary:
@@ -26,7 +27,11 @@ Steps necessary:
 ```{r}
 conference_raw <- read_excel("Conference Talks.xlsx") %>%
   mutate(year = 2019,
-         conference = "April")
+         conference = "April") 
+
+
+conference_raw %>%
+  count(Talk)
 
 numbers <- seq(1:100)
 
@@ -217,10 +222,66 @@ ggsave("tf idf of Speakers.jpeg")
 ```
 
 
+```{r}
+conference_sentiments <- conference %>%
+  inner_join(get_sentiments("afinn"), by = "word")
+  
+conference_sentiments %>%
+  group_by(Talk, Author) %>%
+  summarize(total_sentiment = sum(score)) %>% 
+  ungroup() %>%
+  mutate(Talk = fct_reorder(Talk, total_sentiment)) %>%
+  ggplot(aes(Talk, total_sentiment, label = Author, fill = total_sentiment)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(hjust = -.1) +
+  ylim(0,400) +
+  labs(x = "", y = "Net Sentiment Score",
+       title = "Which Talk was the 'Most Positive'?") +
+  coord_flip() +
+  theme_light()
+
+ggsave("Talks sentiment.jpeg")
+
+conference_sentiments %>%
+  group_by(Talk, Author) %>%
+  ungroup() %>%
+  filter(Author == "M. Russell Ballard") %>%
+  count(word, score) %>%
+  mutate(weighted_score = score * n) %>%
+  mutate(word = fct_reorder(word, weighted_score)) %>%
+  arrange(desc(weighted_score)) %>%
+  head(12) %>%
+  ggplot(aes(x = word, y = weighted_score, fill = weighted_score)) +
+  geom_col(show.legend = FALSE) +
+  labs(x = "", y = "Weighted Sentiment Score",
+       title = "Which Words Made Ballard the Most Positive?") +
+  coord_flip() +
+  theme_light()
+
+ggsave("ballard talk sentiment.jpeg")
+
+conference_sentiments %>%
+  group_by(Talk, Author) %>%
+  ungroup() %>%
+  filter(Author == "D. Todd Christofferson") %>%
+  count(word, score) %>%
+  mutate(weighted_score = score * n) %>%
+  mutate(word = fct_reorder(word, weighted_score)) %>%
+  arrange(weighted_score) %>%
+  head(12) %>%
+  ggplot(aes(x = word, y = weighted_score, fill = weighted_score)) +
+  geom_col(show.legend = FALSE) +
+  labs(x = "", y = "Weighted Sentiment Score",
+       title = "Which Words Made Ballard the Least Positive?") +
+  coord_flip() +
+  scale_fill_gradient(low = "red", high = "#FFE4E1") +
+  theme_light()
+
+ggsave("Christofferson talks.jpeg")
+```
 
 
 
-5. sentiment
 6. topic modeling
     - Use this informed maybe by word clouds
     

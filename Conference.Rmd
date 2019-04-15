@@ -20,6 +20,8 @@ library(igraph)
 library(ggraph)
 library(stringr)
 library(gridExtra)
+
+theme_set(theme_light())
 ```
 
 Steps necessary:
@@ -342,7 +344,7 @@ ggplot(topic_term_choice, aes(order, beta, fill = topic)) +
     breaks = topic_term_choice$order,
     labels = topic_term_choice$term,
     expand = c(0,0)) +
-  coord_flip()
+  coord_flip() 
 
 # ggsave("topics.jpeg")
 ```

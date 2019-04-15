@@ -282,6 +282,76 @@ ggsave("Christofferson talks.jpeg")
 
 
 
+## Topic Modeling
+
+Now I want to do topic modeling for the conference.  First I have to change our tidy text format into a document term matrix.  This requires doing a quick count of each word in a talk, then specifying the talk, word, and count.  Then we can use the `LDA` function to make 5 topics.  Then I tidy it back up and add the beta value which gives a probability that this specific word fits into that topic.  Thus, in our 5 topic category, every word will have 5 rows.
+```{r}
+library(topicmodels)
+
+
+conference_dtm <- conference %>%
+  count(Talk, word) %>%
+  cast_dtm(Talk, word, n)
+
+
+conference_lda <- LDA(conference_dtm, k = 5, control = list(seed = 2019))
+
+conference_topic <- tidy(conference_lda, matrix = "beta")
+conference_topic
+```
+
+### Visualizing the five topics
+
+This is by far the hardest part of the analysis so far.
+
+First thing I wanted to do was look at the most relevant words, so I kepts the top 100 words for each topic (decided by each beta).  Then I filled in all NAs with a 0.
+
+```{r}
+betas <- conference_topic %>%
+  group_by(topic) %>%
+  top_n(100, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta) %>%
+  spread(topic, beta)
+
+betas[is.na(betas)] <- 0  
+```
+
+
+Now here comes the triick part. First thing i did was to gather back the data frame so that there were only three columns: term, topic, and beta with multiple rows for a word.  Then I grouped everything by term, then I arranged everything by term and then by beta, so that we would have words grouped together with the highest beta on top and the lowest beta on bottom of the grouping.  That part is the key.  Because then I use the `first` function from dplyr to figure out which topic-term combo had the highest beta.  By saving it into another variable I was able to filter the entire dataset to only include one row per word, and that word was associated with a single topic. Thus, I basically made the system decide where a word should go (forcing a prediction).  After that I simply took a handful of the top values for each topic and fit in a nifty trick that helps me sort bar charts that are ordered over facets (big shout out to [this post](https://drsimonj.svbtle.com/ordering-categories-within-ggplot2-facets)).  It is a work around, but it appears to work.  
+
+Lastly, I graph the results.
+```{r}
+topic_term_choice <- betas %>%
+  gather(topic, beta, -term) %>%
+  group_by(term) %>%
+  arrange(term, desc(beta)) %>%
+  mutate(first = first(beta)) %>%
+  filter(beta == first) %>%
+  ungroup() %>%
+  group_by(topic) %>%
+  top_n(10, beta) %>%
+  ungroup() %>%
+  arrange(topic, beta) %>%
+  mutate(order = row_number())
+
+ggplot(topic_term_choice, aes(order, beta, fill = topic)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  scale_x_continuous(
+    breaks = topic_term_choice$order,
+    labels = topic_term_choice$term,
+    expand = c(0,0)) +
+  coord_flip()
+
+# ggsave("topics.jpeg")
+```
+
+```{r}
+conference_docs <- tidy(conference_lda, matrix = "gamma")
+```
+
+
 6. topic modeling
     - Use this informed maybe by word clouds
     

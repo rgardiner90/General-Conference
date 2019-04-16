@@ -20,6 +20,7 @@ library(igraph)
 library(ggraph)
 library(stringr)
 library(gridExtra)
+library(koRpus)
 
 theme_set(theme_light())
 ```
@@ -354,8 +355,97 @@ conference_docs <- tidy(conference_lda, matrix = "gamma")
 ```
 
 
-6. topic modeling
-    - Use this informed maybe by word clouds
-    
-    
-    
+## Readability
+
+```{r}
+authors <- unique(conference_raw$Author)
+
+authors <- function(author) {
+  author <- conference_raw %>%
+    filter(Author == author) %>%
+    select(Text) 
+}
+
+conference_raw %>%
+    filter(Author == "Henry B. Eyring") %>%
+    select(Text) %>%
+  write.table("eyring.txt")
+
+conference_raw %>%
+    filter(Author == "Russell M. Nelson") %>%
+    select(Text) %>%
+  write.table("nelson.txt")
+
+conference_raw %>%
+  filter(Author == "Dallin H. Oaks") %>%
+  select(Text) %>%
+  write.table("oaks.txt")
+```
+
+
+
+All of this came from the this [website tutorial](https://reaktanz.de/R/pckg/koRpus/koRpus_vignette.html)
+```{r}
+library(koRpus.lang.en)
+```
+
+First we want to tokenize a text document.  I actually created a text document of Bednar's talk.  
+```{r}
+bednar <- tokenize("bednar.txt",
+         lang = "en",
+         doc_id = "Bednar")
+eyring <- tokenize("eyring.txt",
+                   lang = "en",
+                   doc_id = "Eyring")
+oaks <- tokenize("oaks.txt",
+                 lang = "en",
+                 doc_id = "Oaks")
+nelson <- tokenize("nelson.txt",
+                   lang = "en",
+                   doc_id = "Nelson")
+```
+
+
+Now I am told we want to do some hyphenation.  This method is apparently not perfect, but I am doing to keep moving on.  Otherwise, I have to fix the problems myself using `correct.hyph` and this is just a demo.
+```{r}
+hyph_eyring <- hyphen(eyring)
+hyph_oaks <- hyphen(oaks)
+hyph_nelson <- hyphen(nelson)
+
+head(hyphenText(hyph_eyring))
+```
+
+Now we should be able to feed it into the `readability()` function to calculate the real interest!
+
+```{r}
+readability_eyring <- readability(eyring, hyphen = hyph_eyring)
+readability_oaks <- readability(oaks, hyphen = hyph_oaks)
+readability_nelson <- readability(nelson, hyphen = hyph_nelson)
+
+readability_eyring
+```
+
+```{r}
+summary(readability_eyring)
+
+rd_eyring <- readability_eyring@ARI$grade
+rd_oaks <- readability_oaks@ARI$grade
+rd_nelson <- readability_nelson@ARI$grade
+
+readability_scores <- rbind(rd_eyring, rd_oaks, rd_nelson)
+names <- c("Eyring", "Oaks", "Nelson")
+
+readability_scores <- cbind(readability_scores, names)
+readability_scores <- as_tibble(readability_scores, names)
+
+readability_scores %>%
+  rename("GradeLevel" = 1) %>%
+  mutate(names = fct_reorder(names, GradeLevel)) %>%
+  ggplot(aes(names, GradeLevel)) +
+  geom_col() +
+  labs(x = "", y ="Grade Level - Automated Readability Index",
+       title = "How Difficult is it to understand the First Presidency Talks?")
+
+ggsave("readability.jpeg")
+```
+

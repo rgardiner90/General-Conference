@@ -102,7 +102,7 @@ word_cors
 ```
 
 ```{r}
-data$carb <- factor(data$carb, levels = data$carb[order(-data$mpg)])
+# data$carb <- factor(data$carb, levels = data$carb[order(-data$mpg)])
 
 
 word_cors %>%
@@ -231,7 +231,7 @@ conference_sentiments <- conference %>%
   
 conference_sentiments %>%
   group_by(Talk, Author) %>%
-  summarize(total_sentiment = sum(score)) %>% 
+  summarize(total_sentiment = sum(value)) %>% 
   ungroup() %>%
   mutate(Talk = fct_reorder(Talk, total_sentiment)) %>%
   ggplot(aes(Talk, total_sentiment, label = Author, fill = total_sentiment)) +
@@ -243,14 +243,14 @@ conference_sentiments %>%
   coord_flip() +
   theme_light()
 
-ggsave("Talks sentiment.jpeg")
+# ggsave("Talks sentiment.jpeg")
 
 conference_sentiments %>%
   group_by(Talk, Author) %>%
   ungroup() %>%
   filter(Author == "M. Russell Ballard") %>%
-  count(word, score) %>%
-  mutate(weighted_score = score * n) %>%
+  count(word, value) %>%
+  mutate(weighted_score = value * n) %>%
   mutate(word = fct_reorder(word, weighted_score)) %>%
   arrange(desc(weighted_score)) %>%
   head(12) %>%
@@ -261,14 +261,14 @@ conference_sentiments %>%
   coord_flip() +
   theme_light()
 
-ggsave("ballard talk sentiment.jpeg")
+# ggsave("ballard talk sentiment.jpeg")
 
 conference_sentiments %>%
   group_by(Talk, Author) %>%
   ungroup() %>%
   filter(Author == "D. Todd Christofferson") %>%
-  count(word, score) %>%
-  mutate(weighted_score = score * n) %>%
+  count(word, value) %>%
+  mutate(weighted_score = value * n) %>%
   mutate(word = fct_reorder(word, weighted_score)) %>%
   arrange(weighted_score) %>%
   head(12) %>%
@@ -280,7 +280,7 @@ conference_sentiments %>%
   scale_fill_gradient(low = "red", high = "#FFE4E1") +
   theme_light()
 
-ggsave("Christofferson talks.jpeg")
+# ggsave("Christofferson talks.jpeg")
 ```
 
 
@@ -391,9 +391,9 @@ library(koRpus.lang.en)
 
 First we want to tokenize a text document.  I actually created a text document of Bednar's talk.  
 ```{r}
-bednar <- tokenize("bednar.txt",
-         lang = "en",
-         doc_id = "Bednar")
+# bednar <- tokenize("bednar.txt",
+#          lang = "en",
+#          doc_id = "Bednar")
 eyring <- tokenize("eyring.txt",
                    lang = "en",
                    doc_id = "Eyring")
@@ -436,10 +436,11 @@ readability_scores <- rbind(rd_eyring, rd_oaks, rd_nelson)
 names <- c("Eyring", "Oaks", "Nelson")
 
 readability_scores <- cbind(readability_scores, names)
-readability_scores <- as_tibble(readability_scores, names)
+readability_scores <- as.data.frame(readability_scores, names)
 
 readability_scores %>%
   rename("GradeLevel" = 1) %>%
+  mutate(GradeLevel = as.numeric(GradeLevel)) %>%
   mutate(names = fct_reorder(names, GradeLevel)) %>%
   ggplot(aes(names, GradeLevel)) +
   geom_col() +

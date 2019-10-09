@@ -1,0 +1,76 @@
+---
+title: "conference"
+author: "Richard G. Gardiner"
+date: "10/6/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(rvest)
+library(tidyverse)
+```
+
+
+Getting list of all links
+```{r}
+conference_page <- read_html("https://www.churchofjesuschrist.org/general-conference?lang=eng&country=ca")
+
+landing_page <- conference_page %>%
+  html_nodes(".lumen-tile__link ") %>%
+  html_attr("href") %>%
+  tibble() %>%
+  rename("link" = 1) %>%
+  mutate(full_link = paste0('https://www.churchofjesuschrist.org', link))
+```
+
+
+Creating Function
+```{r}
+collect_speaker <- function(x) {
+  
+  url <- x
+  
+  individual <- read_html(url)
+  
+  title <- individual %>%
+    html_nodes("#title1") %>%
+    html_text()
+  
+  speaker <- individual %>%
+    html_nodes("#author1") %>%
+    html_text()
+
+  text <- individual %>%
+    html_nodes(".body-block p") %>%
+    html_text()
+  
+  talk <- tibble(speaker = speaker, 
+                    title = title, 
+                    text = text) 
+  
+  return(talk)
+}
+
+collect_speaker(landing_page$full_link[2])
+```
+
+Creating dataset for analysis
+```{r}
+landing_page2 <- landing_page$full_link[-1]
+
+talks_list <- lapply(landing_page2, collect_speaker)
+
+talks <- talks_list %>%
+  tibble() %>%
+  unnest()
+
+talks %>%
+  filter(str_detect(speaker, "Nelson"))
+```
+
+One interesting thing is that Nelson's talk doesn't show up at the end AND Holland's talk shows up at the very end.

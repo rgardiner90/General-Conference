@@ -1,12 +1,11 @@
 library(shiny)
-library(pdftools)
 library(tidyverse)
 library(tidytext)
 library(tidylo)
 
+talks <- read_csv("shiny_talks.csv")
 
-custom_stops <- c("https", "www", "google")
-
+talk <- unique(talks$title)
 
 
 
@@ -19,9 +18,9 @@ ui <- fluidPage(
 
   
 ###### Have them select the talk they want to evaluate
-  fileInput("file1", "Choose PDF File",
-            multiple = FALSE,
-            accept = c(".pdf")),
+  selectInput("talk", "Choose a Talk",
+            choices = talk,
+            selected = talk[1]),
   
   
   sidebarLayout(
@@ -36,7 +35,7 @@ ui <- fluidPage(
     mainPanel(
       tabsetPanel(type = "tabs",
                   tabPanel("Most Common Words", plotOutput("contents")),
-                  tabPanel("Unique Words", plotOutput("unique"))
+                  tabPanel("Most Unique Words", plotOutput("unique"))
       )
     )
   )
@@ -47,38 +46,22 @@ server <- function(input, output) {
   
   output$contents <- renderPlot({
     
-    req(input$file1)
-    
-    
-    tryCatch(
-      {
-        df_raw <- pdftools::pdf_text(input$file1$datapath) %>%
-          read_lines() %>%
-          str_squish() %>%
-          enframe()
-        
-      },
-      error = function(e) {
-        # return a safeError if a parsing error occurs
-        stop(safeError(e))
-      }
-    )
-    
+    df_raw <- talks %>%
+      filter(title == input$talk)
     
     if(input$ngrams == 1) {
       
       df_unigram <- df_raw %>%
-        unnest_tokens("word", value) %>%
+        unnest_tokens("word", text) %>%
         filter(!str_detect(word, "[:digit:]")) %>%
         anti_join(stop_words, by = "word") %>%
-        filter(!word %in% custom_stops) %>%
         mutate(source = "Article")
       
       
       df_unigram %>%
         count(word, sort = TRUE) %>%
         head(15) %>%
-        mutate(word = fct_reorder(word, n)) %>%
+        mutate(word = fct_reorder(str_to_title(word), n)) %>%
         ggplot(aes(x = word, y = n, fill = n)) +
         geom_col(show.legend = FALSE) +
         labs(x = "", y = "Number of Occurences",
@@ -91,21 +74,18 @@ server <- function(input, output) {
     } else if(input$ngrams == 2) {
       
       df_bigram <- df_raw %>%
-        unnest_tokens("bigram", value, token = "ngrams", n = 2) %>%
+        unnest_tokens("bigram", text, token = "ngrams", n = 2) %>%
         separate(bigram, c("word1", "word2"), sep = " ") %>%
         anti_join(stop_words, by = c("word1" = "word")) %>%
         anti_join(stop_words, by = c("word2" = "word")) %>%
         filter(!str_detect(word1, "[:digit:]"),
-               !str_detect(word2, "[:digit:]"),
-               !word1 %in% custom_stops,
-               !word2 %in% custom_stops) %>%
-        unite(bigram, c("word1", "word2"), sep = " ") %>%
-        select(1:2)
+               !str_detect(word2, "[:digit:]")) %>%
+        unite(bigram, c("word1", "word2"), sep = " ")
       
       df_bigram %>%
         count(bigram, sort = TRUE) %>%
         head(15) %>%
-        mutate(bigram = fct_reorder(bigram, n)) %>%
+        mutate(bigram = fct_reorder(str_to_title(bigram), n)) %>%
         ggplot(aes(x = bigram, y = n, fill = n)) +
         geom_col(show.legend = FALSE) +
         labs(x = "", y = "Number of Occurences",
@@ -116,24 +96,20 @@ server <- function(input, output) {
       
     } else {
       df_trigram <- df_raw %>%
-        unnest_tokens("bigram", value, token = "ngrams", n = 3) %>%
+        unnest_tokens("bigram", text, token = "ngrams", n = 3) %>%
         separate(bigram, c("word1", "word2", "word3"), sep = " ") %>%
         anti_join(stop_words, by = c("word1" = "word")) %>%
         anti_join(stop_words, by = c("word2" = "word")) %>%
         anti_join(stop_words, by = c("word3" = "word")) %>%
         filter(!str_detect(word1, "[:digit:]"),
                !str_detect(word2, "[:digit:]"),
-               !str_detect(word3, "[:digit:]"),
-               !word1 %in% custom_stops,
-               !word2 %in% custom_stops,
-               !word3 %in% custom_stops) %>%
-        unite(trigram, c("word1", "word2", "word3"), sep = " ") %>%
-        select(1:2)
+               !str_detect(word3, "[:digit:]")) %>%
+        unite(trigram, c("word1", "word2", "word3"), sep = " ") 
       
       df_trigram %>%
         count(trigram, sort = TRUE) %>%
         head(15) %>%
-        mutate(trigram = fct_reorder(trigram, n)) %>%
+        mutate(trigram = fct_reorder(str_to_title(trigram), n)) %>%
         ggplot(aes(x = trigram, y = n, fill = n)) +
         geom_col(show.legend = FALSE) +
         labs(x = "", y = "Number of Occurences",
@@ -147,31 +123,21 @@ server <- function(input, output) {
   
   output$unique <- renderPlot({
     
-    req(input$file1)
+    df_raw <- talks %>%
+      filter(title == input$talk)
     
-    
-    tryCatch(
-      {
-        df_raw <- pdftools::pdf_text(input$file1$datapath) %>%
-          read_lines() %>%
-          str_squish() %>%
-          enframe()
-        
-      },
-      error = function(e) {
-        # return a safeError if a parsing error occurs
-        stop(safeError(e))
-      }
-    )
-    
-    training <- read_csv("https://raw.githubusercontent.com/rgardiner90/keywords-shiny/master/unique_training.csv") 
-    
-    df_unigram <- df_raw %>%
-      unnest_tokens("word", value) %>%
+    training <- talks %>%
+      filter(title != input$talk) %>%
+      unnest_tokens("word", text) %>%
       filter(!str_detect(word, "[:digit:]")) %>%
       anti_join(stop_words, by = "word") %>%
-      filter(!word %in% custom_stops) %>%
-      mutate(source = "Article")
+      mutate(source = "training")
+    
+    df_unigram <- df_raw %>%
+      unnest_tokens("word", text) %>%
+      filter(!str_detect(word, "[:digit:]")) %>%
+      anti_join(stop_words, by = "word") %>%
+      mutate(source = "main")
     
     combined <- rbind(df_unigram, training) %>%
       group_by(source) %>%
@@ -179,10 +145,10 @@ server <- function(input, output) {
     
     combined %>%
       bind_log_odds(source, word, n) %>%
-      filter(source == "Article") %>%
+      filter(source == "main") %>%
       arrange(desc(log_odds)) %>%
       head(15) %>%
-      mutate(word = fct_reorder(word, log_odds)) %>%
+      mutate(word = fct_reorder(str_to_title(word), log_odds)) %>%
       ggplot(aes(x = word, y = log_odds, fill = log_odds)) +
       geom_col(show.legend = FALSE) +
       labs(x = "", y = "Weighted Log-Odds",

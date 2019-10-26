@@ -67,10 +67,6 @@ talks_list <- lapply(landing_page2, collect_speaker)
 
 talks <- talks_list %>%
   tibble() %>%
-  unnest()
-
-talks %>%
-  filter(str_detect(speaker, "Nelson"))
+  unnest() %>%
+  filter(!(str_detect(title, "Sustaining")))
 ```
-
-One interesting thing is that Nelson's talk doesn't show up at the end AND Holland's talk shows up at the very end.
